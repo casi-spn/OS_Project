@@ -1,3 +1,5 @@
+#include <signal.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,6 +7,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <sys/wait.h>
 
 #include "report.h"
 #include "permissions.h"
@@ -12,6 +15,8 @@
 #define REPORTS_NAME "reports.dat"
 #define CFG_NAME "district.cfg"
 #define LOG_NAME "logged_district"
+
+
 
 static void build_path(char *out, const char *district, const char *file) {
     sprintf(out, "%s/%s", district, file);
@@ -152,6 +157,61 @@ static int next_report_id(const char *district) {
     return max_id + 1;
 }
 
+static int notify_monitor() {
+    int fd;
+    char buffer[64];
+    ssize_t bytes;
+    pid_t pid;
+    char proc_path[128];
+    char proc_name[64];
+
+    fd = open(".monitor_pid", O_RDONLY);
+    if (fd == -1) {
+        return 0;
+    }
+
+    bytes = read(fd, buffer, sizeof(buffer) - 1);
+    close(fd);
+
+    if (bytes <= 0) {
+        return 0;
+    }
+
+    buffer[bytes] = '\0';
+    pid = (pid_t)atoi(buffer);
+
+    if (pid <= 0) {
+        return 0;
+    }
+
+    sprintf(proc_path, "/proc/%d/comm", pid);
+
+    fd = open(proc_path, O_RDONLY);
+    if (fd == -1) {
+        return 0;
+    }
+
+    bytes = read(fd, proc_name, sizeof(proc_name) - 1);
+    close(fd);
+
+    if (bytes <= 0) {
+        return 0;
+    }
+
+    proc_name[bytes] = '\0';
+    proc_name[strcspn(proc_name, "\n")] = '\0';
+
+    if (strcmp(proc_name, "monitor_reports") != 0) {
+        return 0;
+    }
+
+    if (kill(pid, SIGUSR1) == -1) {
+        return 0;
+    }
+
+    return 1;
+}
+
 static void add_report(const char *district, const char *role, const char *user) {
     char path[256];
     int fd;
@@ -206,7 +266,11 @@ static void add_report(const char *district, const char *role, const char *user)
 
     printf("Report added with ID %d\n", r.id);
 
-    log_action(district, role, user, "add_report");
+if (notify_monitor()) {
+    log_action(district, "manager", user, "add_report; monitor informed with SIGUSR1");
+} else {
+    log_action(district, "manager", user, "add_report; monitor could not be informed");
+}
 }
 
 static void list_reports(const char *district, const char *role) {
@@ -449,6 +513,66 @@ static void usage(void) {
     printf("./city_manager --role ROLE --user USER --filter DISTRICT condition...\n");
 }
 
+static void remove_district(const char *district, const char *role, const char *user) {
+    char linkname[256];
+    pid_t pid;
+    int status;
+
+    // check role
+    if (strcmp(role, "manager") != 0) {
+        printf("Only manager can remove districts.\n");
+        return;
+    }
+
+    // safty checks for district name
+    if (strcmp(district, ".") == 0 || strcmp(district, "..") == 0) {
+        printf("Invalid district name.\n");
+        return;
+    }
+
+    if (strlen(district) == 0) {
+        printf("Invalid district name.\n");
+        return;
+    }
+
+    // remove symlink if exists
+    sprintf(linkname, "active_reports-%s", district);
+    unlink(linkname);
+
+    // create child process to execute rm -rf
+    pid = fork();
+
+    if (pid < 0) {
+        perror("fork");
+        return;
+    }
+
+    if (pid == 0) {
+        // child process
+
+        // execute: rm -rf <district>
+        execlp("rm", "rm", "-rf", district, NULL);
+
+        // if exec fails:
+        perror("execlp");
+        exit(1);
+    } else {
+        // parent process
+
+        waitpid(pid, &status, 0);
+
+        if (WIFEXITED(status)) {
+            printf("District '%s' removed successfully.\n", district);
+        } else {
+            printf("Failed to remove district.\n");
+        }
+
+        // optional log
+        log_action(district, role, user, "remove_district");
+    }
+
+}
+
 int main(int argc, char **argv) {
     char *role = NULL;
     char *user = NULL;
@@ -481,6 +605,11 @@ int main(int argc, char **argv) {
             add_report(argv[i + 1], role, user);
             return 0;
         }
+        if (strcmp(argv[i], "--remove_district") == 0 && i + 1 < argc) {
+            remove_district(argv[i + 1], role, user);
+            return 0;
+        }
+
 
         if (strcmp(argv[i], "--list") == 0 && i + 1 < argc) {
             list_reports(argv[i + 1], role);
