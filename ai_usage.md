@@ -1,4 +1,5 @@
 # AI Usage Report
+Phase1:
 I used ChatGPT to help with the required AI-assisted functions:
 
 1) parse_condition()
@@ -28,3 +29,26 @@ What I changed:
 -I adapted the function to my Report structure;
 -I reused helper functions (compare_int, compare_string) to keep the code as simple as possible;
 -I added that it returns 0 for unsupported fields.
+
+Phase2:
+
+
+I used ChatGPT to help with the process and signal parts:
+
+1) remove_district using fork() and execlp()
+2) monitor_reports using sigaction()
+
+
+1) For remove_district, the AI suggested creating a child process with fork()
+and replacing it with the external command rm -rf using execlp() 
+I added role checking so only the manager can remove a district, 
+and I made sure the corresponding active_reports-* symbolic link is also removed.
+
+2) For monitor_reports, the AI helped structure the program 
+so it creates .monitor_pid, waits for signals, handles SIGUSR1
+by printing a message, and handles SIGINT by deleting .monitor_pid before exiting. 
+I used sigaction() instead of signal(),as stated in the requirement.
+
+
+What I learned:
+I learned how to use fork(), execlp(), waitpid(), sigaction()kill().
