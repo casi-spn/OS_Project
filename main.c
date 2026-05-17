@@ -16,8 +16,6 @@
 #define CFG_NAME "district.cfg"
 #define LOG_NAME "logged_district"
 
-
-
 static void build_path(char *out, const char *district, const char *file) {
     sprintf(out, "%s/%s", district, file);
 }
@@ -25,6 +23,8 @@ static void build_path(char *out, const char *district, const char *file) {
 static void create_symlink_for_district(const char *district) {
     char linkname[256];
     char target[256];
+    
+    
 
     sprintf(linkname, "active_reports-%s", district);
     build_path(target, district, REPORTS_NAME);
