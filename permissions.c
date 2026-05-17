@@ -8,6 +8,8 @@ void mode_to_string(mode_t mode, char *out) {
     out[1] = (mode & S_IWUSR) ? 'w' : '-';
     out[2] = (mode & S_IXUSR) ? 'x' : '-';
 
+    
+
     out[3] = (mode & S_IRGRP) ? 'r' : '-';
     out[4] = (mode & S_IWGRP) ? 'w' : '-';
     out[5] = (mode & S_IXGRP) ? 'x' : '-';
