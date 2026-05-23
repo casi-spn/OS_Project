@@ -52,3 +52,52 @@ I used sigaction() instead of signal(),as stated in the requirement.
 
 What I learned:
 I learned how to use fork(), execlp(), waitpid(), sigaction()kill().
+
+
+
+Phase 3:
+
+I used ChatGPT to help with the inter-process communication parts:
+
+1. communication through pipes using pipe() and dup2()
+
+2. running external programs using fork() and exec()
+
+3. continuously reading monitor output inside city_hub
+
+4. For the start_monitor command, the AI suggested creating a pipe,
+   forking a background process (hub_mon), and redirecting the monitor's
+   standard output into the pipe using dup2().
+
+The AI also suggested using execl() to run the external monitor_reports
+program from inside the child process.
+
+I adapted the implementation so that city_hub continuously reads and
+displays monitor messages while still accepting commands from the user.
+
+2. The AI also helped structure the communication format between
+   monitor_reports and city_hub.
+
+The monitor messages were changed to use prefixes such as:
+
+MSG:
+ERR:
+END:
+
+so the hub could distinguish between normal messages, errors,
+and monitor shutdown events.
+
+3. For calculate_scores, the AI helped explain how to:
+
+-create one scorer process per district
+-redirect each scorer's standard output through a pipe
+- collect all scorer outputs in the parent process
+
+I manually adapted the solution to work with my Report structure
+and district directories.
+
+What I learned:
+
+I learned how to use pipe(), dup2(), exec(), and how parent and child
+processes communicate through pipes. I also learned how background
+processes work and how multiple child processes can run simultaneously.
